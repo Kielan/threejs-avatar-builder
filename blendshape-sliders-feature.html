@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Avatar Builder Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+body {
+  margin: 0;
+  font-family: sans-serif;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: #f5f5f7;
+}
+
+#ui {
+  width: 340px;
+  background: white;
+  border-right: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+}
+
+.tabs {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.tab {
+  cursor: pointer;
+  font-weight: 600;
+  opacity: 0.4;
+}
+
+.tab.active {
+  opacity: 1;
+}
+
+.options {
+  padding: 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.slider {
+  display: flex;
+  flex-direction: column;
+}
+
+.bottom {
+  padding: 10px;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 10px;
+}
+
+button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#canvas {
+  flex: 1;
+}
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <div class="tabs">
+    <div class="tab active" data-tab="blend">Face</div>
+    <div class="tab" data-tab="clothes">Clothes</div>
+  </div>
+
+  <div class="options" id="options"></div>
+
+  <div class="bottom">
+    <button onclick="saveAvatar()">Save</button>
+    <button onclick="loadAvatar()">Load</button>
+  </div>
+</div>
+
+<div id="canvas"></div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/loaders/GLTFLoader.js';
+
+// ---------- SCENE ----------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf0f0f0);
+
+const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 1.5, 3);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth - 340, window.innerHeight);
+document.getElementById("canvas").appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1));
+
+// ---------- STATE ----------
+const state = {
+  blends: {},
+  shirt: 0,
+  pants: 0
+};
+
+// ---------- AVATAR ----------
+let avatar, mixer;
+let skinnedMesh = null;
+
+// ---------- LOAD GLTF ----------
+const loader = new GLTFLoader();
+
+// Public demo rig (has animation, may or may not include morph targets)
+const MODEL_URL = "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb";
+
+loader.load(MODEL_URL, (gltf) => {
+  avatar = gltf.scene;
+  avatar.scale.set(0.8,0.8,0.8);
+  scene.add(avatar);
+
+  // Animation
+  mixer = new THREE.AnimationMixer(avatar);
+  gltf.animations.forEach(clip => {
+    mixer.clipAction(clip).play();
+  });
+
+  // Find mesh with morph targets
+  avatar.traverse(obj => {
+    if (obj.isMesh && obj.morphTargetInfluences) {
+      skinnedMesh = obj;
+      setupBlendUI(obj);
+    }
+  });
+
+  applyTextures();
+});
+
+// ---------- BLENDSHAPES ----------
+function setupBlendUI(mesh) {
+  const options = document.getElementById("options");
+  options.innerHTML = "";
+
+  mesh.morphTargetDictionary && Object.keys(mesh.morphTargetDictionary).forEach(name => {
+    const div = document.createElement("div");
+    div.className = "slider";
+
+    const label = document.createElement("label");
+    label.innerText = name;
+
+    const input = document.createElement("input");
+    input.type = "range";
+    input.min = 0;
+    input.max = 1;
+    input.step = 0.01;
+
+    input.oninput = (e) => {
+      const index = mesh.morphTargetDictionary[name];
+      mesh.morphTargetInfluences[index] = e.target.value;
+      state.blends[name] = e.target.value;
+    };
+
+    div.appendChild(label);
+    div.appendChild(input);
+    options.appendChild(div);
+  });
+}
+
+// ---------- TEXTURES ----------
+const textureLoader = new THREE.TextureLoader();
+
+const shirts = [
+  "https://threejs.org/examples/textures/uv_grid_opengl.jpg",
+  "https://threejs.org/examples/textures/brick_diffuse.jpg"
+];
+
+const pants = [
+  "https://threejs.org/examples/textures/terrain/grasslight-big.jpg",
+  "https://threejs.org/examples/textures/hardwood2_diffuse.jpg"
+];
+
+function applyTextures() {
+  if (!avatar) return;
+
+  avatar.traverse(obj => {
+    if (obj.isMesh) {
+      if (obj.name.toLowerCase().includes("body")) {
+        obj.material.map = textureLoader.load(shirts[state.shirt]);
+      }
+      if (obj.name.toLowerCase().includes("leg")) {
+        obj.material.map = textureLoader.load(pants[state.pants]);
+      }
+    }
+  });
+}
+
+// ---------- UI ----------
+const optionsDiv = document.getElementById("options");
+
+function loadClothesUI() {
+  optionsDiv.innerHTML = "";
+
+  shirts.forEach((_, i) => {
+    const btn = document.createElement("button");
+    btn.innerText = "Shirt " + i;
+    btn.onclick = () => {
+      state.shirt = i;
+      applyTextures();
+    };
+    optionsDiv.appendChild(btn);
+  });
+
+  pants.forEach((_, i) => {
+    const btn = document.createElement("button");
+    btn.innerText = "Pants " + i;
+    btn.onclick = () => {
+      state.pants = i;
+      applyTextures();
+    };
+    optionsDiv.appendChild(btn);
+  });
+}
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+
+    if (tab.dataset.tab === "clothes") {
+      loadClothesUI();
+    } else {
+      if (skinnedMesh) setupBlendUI(skinnedMesh);
+    }
+  };
+});
+
+// ---------- SAVE / LOAD ----------
+window.saveAvatar = function () {
+  localStorage.setItem("avatarPro", JSON.stringify(state));
+  alert("Saved");
+};
+
+window.loadAvatar = function () {
+  const data = localStorage.getItem("avatarPro");
+  if (!data) return alert("No save");
+
+  Object.assign(state, JSON.parse(data));
+
+  if (skinnedMesh) {
+    Object.keys(state.blends).forEach(name => {
+      const i = skinnedMesh.morphTargetDictionary[name];
+      if (i !== undefined) {
+        skinnedMesh.morphTargetInfluences[i] = state.blends[name];
+      }
+    });
+  }
+
+  applyTextures();
+};
+
+// ---------- LOOP ----------
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  if (mixer) mixer.update(clock.getDelta());
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ---------- RESIZE ----------
+window.addEventListener("resize", () => {
+  camera.aspect = (window.innerWidth - 340) / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth - 340, window.innerHeight);
+});
+</script>
+</body>
+</html>
