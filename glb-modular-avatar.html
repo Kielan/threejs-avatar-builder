@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>GLB Modular Avatar System</title>
+
+<style>
+body { margin:0; display:flex; height:100vh; font-family:sans-serif; }
+#ui { width:300px; background:#fff; border-right:1px solid #ddd; }
+.tabs { display:flex; justify-content:space-around; padding:10px; }
+.tab { cursor:pointer; opacity:0.5; }
+.tab.active { opacity:1; font-weight:bold; }
+.options { padding:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.option { background:#eee; height:60px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+#canvas { flex:1; }
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+  <div class="tabs">
+    <div class="tab active" data-tab="hair">Hair</div>
+    <div class="tab" data-tab="outfit">Outfit</div>
+  </div>
+  <div class="options" id="options"></div>
+</div>
+
+<div id="canvas"></div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/loaders/GLTFLoader.js';
+
+// ---------------- SCENE ----------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf0f0f0);
+
+const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 1.4, 4);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth - 300, window.innerHeight);
+document.getElementById("canvas").appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0,1,0);
+controls.update();
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x444444,1));
+const dirLight = new THREE.DirectionalLight(0xffffff,1.2);
+dirLight.position.set(2,4,2);
+scene.add(dirLight);
+
+// ---------------- LOADERS ----------------
+const loader = new GLTFLoader();
+
+// ---------------- AVATAR STATE ----------------
+let baseModel, skeleton, mixer;
+let hairPart, outfitPart;
+
+// ---------------- LOAD BASE BODY ----------------
+loader.load('assets/body.glb', (gltf) => {
+  baseModel = gltf.scene;
+
+  baseModel.traverse(obj => {
+    if (obj.isSkinnedMesh) {
+      skeleton = obj.skeleton;
+    }
+  });
+
+  scene.add(baseModel);
+
+  // animation
+  if (gltf.animations.length) {
+    mixer = new THREE.AnimationMixer(baseModel);
+    const action = mixer.clipAction(gltf.animations[0]);
+    action.play();
+  }
+});
+
+// ---------------- LOAD ANIMATION (OPTIONAL SEPARATE FILE) ----------------
+loader.load('assets/idle.glb', (gltf) => {
+  if (!baseModel) return;
+
+  mixer = new THREE.AnimationMixer(baseModel);
+  const action = mixer.clipAction(gltf.animations[0]);
+  action.play();
+});
+
+// ---------------- APPLY PART ----------------
+function applyPart(path, type) {
+  loader.load(path, (gltf) => {
+
+    let part;
+
+    gltf.scene.traverse(obj => {
+      if (obj.isSkinnedMesh) part = obj;
+    });
+
+    if (!part) return;
+
+    // IMPORTANT: bind to shared skeleton
+    part.bind(skeleton);
+
+    if (type === "hair") {
+      if (hairPart) baseModel.remove(hairPart);
+      hairPart = part;
+      baseModel.add(hairPart);
+    }
+
+    if (type === "outfit") {
+      if (outfitPart) baseModel.remove(outfitPart);
+      outfitPart = part;
+      baseModel.add(outfitPart);
+    }
+  });
+}
+
+// ---------------- UI ----------------
+const optionsDiv = document.getElementById("options");
+
+const config = {
+  hair: [
+    () => applyPart('assets/hair_1.glb', 'hair'),
+    () => applyPart('assets/hair_2.glb', 'hair')
+  ],
+  outfit: [
+    () => applyPart('assets/outfit_1.glb', 'outfit'),
+    () => applyPart('assets/outfit_2.glb', 'outfit')
+  ]
+};
+
+function loadOptions(tab){
+  optionsDiv.innerHTML="";
+  config[tab].forEach(fn=>{
+    const div=document.createElement("div");
+    div.className="option";
+    div.innerText=tab;
+    div.onclick=fn;
+    optionsDiv.appendChild(div);
+  });
+}
+
+document.querySelectorAll(".tab").forEach(tab=>{
+  tab.onclick=()=>{
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+    loadOptions(tab.dataset.tab);
+  };
+});
+
+loadOptions("hair");
+
+// ---------------- LOOP ----------------
+const clock = new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+
+  const dt = clock.getDelta();
+  if (mixer) mixer.update(dt);
+
+  controls.update();
+  renderer.render(scene,camera);
+}
+animate();
+
+// ---------------- RESIZE ----------------
+window.addEventListener("resize",()=>{
+  camera.aspect=(window.innerWidth-300)/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth-300,window.innerHeight);
+});
+</script>
+
+</body>
+</html>
