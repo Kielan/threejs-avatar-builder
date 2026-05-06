@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Three.js Modular Avatar (Skeleton)</title>
+
+<style>
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+  font-family: sans-serif;
+}
+
+#ui {
+  width: 300px;
+  background: #fff;
+  border-right: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+}
+
+.tabs {
+  display: flex;
+  justify-content: space-around;
+  padding: 10px;
+}
+
+.tab {
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+.tab.active {
+  opacity: 1;
+  font-weight: bold;
+}
+
+.options {
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.option {
+  background: #eee;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+#canvas {
+  flex: 1;
+}
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+  <div class="tabs">
+    <div class="tab active" data-tab="hair">Hair</div>
+    <div class="tab" data-tab="outfit">Outfit</div>
+  </div>
+  <div class="options" id="options"></div>
+</div>
+
+<div id="canvas"></div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/controls/OrbitControls.js';
+
+// ---------------- SCENE ----------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf0f0f0);
+
+const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 1.5, 4);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth - 300, window.innerHeight);
+document.getElementById("canvas").appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1, 0);
+controls.update();
+
+// LIGHTING
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(2, 4, 2);
+scene.add(dirLight);
+
+// FLOOR
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(10, 10),
+  new THREE.MeshStandardMaterial({ color: 0xffffff })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -1;
+scene.add(floor);
+
+// ---------------- SKELETON ----------------
+const bones = [];
+
+const root = new THREE.Bone();
+root.position.y = 0;
+
+const spine = new THREE.Bone();
+spine.position.y = 1;
+
+const headBone = new THREE.Bone();
+headBone.position.y = 0.8;
+
+root.add(spine);
+spine.add(headBone);
+
+bones.push(root, spine, headBone);
+
+const skeleton = new THREE.Skeleton(bones);
+
+// ---------------- BASE BODY ----------------
+const bodyGeo = new THREE.CapsuleGeometry(0.4, 1.2, 4, 8);
+const bodyMat = new THREE.MeshStandardMaterial({ color: 0x5555ff });
+
+const bodyMesh = new THREE.SkinnedMesh(bodyGeo, bodyMat);
+
+// bind skeleton
+bodyMesh.add(root);
+bodyMesh.bind(skeleton);
+
+scene.add(bodyMesh);
+
+// ---------------- ATTACHMENT SYSTEM ----------------
+let hairMesh = null;
+let outfitMesh = null;
+
+// HAIR (attached to head bone)
+function setHair(type) {
+  if (hairMesh) headBone.remove(hairMesh);
+
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffaa00 });
+
+  if (type === 0) {
+    hairMesh = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), mat);
+  } else {
+    hairMesh = new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.8, 16), mat);
+  }
+
+  hairMesh.position.y = 0.2;
+  headBone.add(hairMesh);
+}
+
+// OUTFIT (attached to spine)
+function setOutfit(type) {
+  if (outfitMesh) spine.remove(outfitMesh);
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: type === 0 ? 0x222222 : 0xff0000
+  });
+
+  outfitMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 1.2, 0.5),
+    mat
+  );
+
+  outfitMesh.position.y = 0;
+  spine.add(outfitMesh);
+}
+
+// INIT
+setHair(0);
+setOutfit(0);
+
+// ---------------- UI ----------------
+const optionsDiv = document.getElementById("options");
+
+const config = {
+  hair: [
+    () => setHair(0),
+    () => setHair(1)
+  ],
+  outfit: [
+    () => setOutfit(0),
+    () => setOutfit(1)
+  ]
+};
+
+function loadOptions(tab) {
+  optionsDiv.innerHTML = "";
+  config[tab].forEach(fn => {
+    const div = document.createElement("div");
+    div.className = "option";
+    div.innerText = tab;
+    div.onclick = fn;
+    optionsDiv.appendChild(div);
+  });
+}
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    loadOptions(tab.dataset.tab);
+  };
+});
+
+loadOptions("hair");
+
+// ---------------- IDLE ANIMATION ----------------
+let clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const t = clock.getElapsedTime();
+
+  // subtle breathing
+  spine.rotation.z = Math.sin(t) * 0.05;
+
+  // head bob
+  headBone.rotation.y = Math.sin(t * 0.5) * 0.1;
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// ---------------- RESIZE ----------------
+window.addEventListener("resize", () => {
+  camera.aspect = (window.innerWidth - 300) / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth - 300, window.innerHeight);
+});
+</script>
+
+</body>
+</html>
