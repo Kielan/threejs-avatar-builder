@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Experimental Modular Avatar System</title>
+
+<style>
+body { margin:0; display:flex; height:100vh; font-family:sans-serif; }
+#ui { width:320px; background:#fff; border-right:1px solid #ddd; overflow:auto; }
+.section { padding:10px; border-bottom:1px solid #eee; }
+.slider { width:100%; }
+button { width:100%; margin-top:5px; }
+#canvas { flex:1; }
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+  <div class="section">
+    <b>Expressions</b><br/>
+    <input type="range" min="0" max="1" step="0.01" class="slider" id="smile">
+    <input type="range" min="0" max="1" step="0.01" class="slider" id="blink">
+  </div>
+
+  <div class="section">
+    <b>Skin Tone</b><br/>
+    <button onclick="setSkin(0)">Light</button>
+    <button onclick="setSkin(1)">Dark</button>
+  </div>
+
+  <div class="section">
+    <b>Animation</b><br/>
+    <button onclick="playIdle()">Idle</button>
+    <button onclick="playWalk()">Walk</button>
+  </div>
+
+  <div class="section">
+    <b>Crowd</b><br/>
+    <button onclick="spawnCrowd()">Spawn 50</button>
+  </div>
+</div>
+
+<div id="canvas"></div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/loaders/GLTFLoader.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/controls/OrbitControls.js';
+
+// ---------------- CDN BASE ----------------
+const CDN = "https://your-cdn.com/assets/"; // replace later
+
+// ---------------- SCENE ----------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf0f0f0);
+
+const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0,1.4,4);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth-320, window.innerHeight);
+document.getElementById("canvas").appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0,1,0);
+controls.update();
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x444444,1));
+const dirLight = new THREE.DirectionalLight(0xffffff,1.2);
+dirLight.position.set(2,4,2);
+scene.add(dirLight);
+
+// ---------------- LOADERS ----------------
+const loader = new GLTFLoader();
+const texLoader = new THREE.TextureLoader();
+
+// ---------------- STATE ----------------
+let avatar, skinnedMesh, mixer;
+let idleAction, walkAction;
+
+// ---------------- LOAD BASE ----------------
+loader.load(CDN + "body.glb", (gltf)=>{
+  avatar = gltf.scene;
+
+  avatar.traverse(obj=>{
+    if(obj.isSkinnedMesh){
+      skinnedMesh = obj;
+    }
+  });
+
+  scene.add(avatar);
+
+  mixer = new THREE.AnimationMixer(avatar);
+});
+
+// ---------------- LOAD ANIMATIONS ----------------
+function loadAnim(name, cb){
+  loader.load(CDN + name, (gltf)=>{
+    const clip = gltf.animations[0];
+    cb(mixer.clipAction(clip));
+  });
+}
+
+loadAnim("idle.glb", a => idleAction = a);
+loadAnim("walk.glb", a => walkAction = a);
+
+// ---------------- ANIMATION BLENDING ----------------
+function playIdle(){
+  if(!idleAction || !walkAction) return;
+  walkAction.fadeOut(0.5);
+  idleAction.reset().fadeIn(0.5).play();
+}
+
+function playWalk(){
+  if(!idleAction || !walkAction) return;
+  idleAction.fadeOut(0.5);
+  walkAction.reset().fadeIn(0.5).play();
+}
+
+// ---------------- MORPH TARGETS ----------------
+function updateMorph(name, value){
+  if(!skinnedMesh.morphTargetDictionary) return;
+
+  const index = skinnedMesh.morphTargetDictionary[name];
+  if(index !== undefined){
+    skinnedMesh.morphTargetInfluences[index] = value;
+  }
+}
+
+document.getElementById("smile").oninput = e=>{
+  updateMorph("Smile", e.target.value);
+};
+
+document.getElementById("blink").oninput = e=>{
+  updateMorph("Blink", e.target.value);
+};
+
+// ---------------- TEXTURE SWAP ----------------
+const skins = [
+  "textures/skin_1.jpg",
+  "textures/skin_2.jpg"
+];
+
+function setSkin(i){
+  texLoader.load(CDN + skins[i], tex=>{
+    skinnedMesh.material.map = tex;
+    skinnedMesh.material.needsUpdate = true;
+  });
+}
+
+// ---------------- GPU INSTANCING ----------------
+let crowd;
+
+function spawnCrowd(){
+  if(!skinnedMesh) return;
+
+  const geo = skinnedMesh.geometry;
+  const mat = skinnedMesh.material;
+
+  const count = 50;
+
+  crowd = new THREE.InstancedMesh(geo, mat, count);
+
+  const dummy = new THREE.Object3D();
+
+  for(let i=0;i<count;i++){
+    dummy.position.set(
+      (Math.random()-0.5)*10,
+      0,
+      (Math.random()-0.5)*10
+    );
+    dummy.updateMatrix();
+    crowd.setMatrixAt(i, dummy.matrix);
+  }
+
+  scene.add(crowd);
+}
+
+// ---------------- LOOP ----------------
+const clock = new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+
+  const dt = clock.getDelta();
+  if(mixer) mixer.update(dt);
+
+  renderer.render(scene,camera);
+}
+animate();
+
+// ---------------- RESIZE ----------------
+window.addEventListener("resize",()=>{
+  camera.aspect=(window.innerWidth-320)/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth-320,window.innerHeight);
+});
+</script>
+
+</body>
+</html>
