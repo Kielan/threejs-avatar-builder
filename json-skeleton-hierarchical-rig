@@ -54,6 +54,15 @@ body {
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/controls/OrbitControls.js';
+/**
+skeleton hierarchy
+root
+ ├── spine
+ │    ├── head
+ │    ├── leftArm
+ │    └── rightArm
+ └── legs
+**/
 // ---------- SCENE ----------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf0f0f0);
