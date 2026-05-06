@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Avatar Builder (JSON Skeleton)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<style>
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+  font-family: sans-serif;
+  background: #f5f5f7;
+}
+
+#ui {
+  width: 340px;
+  background: white;
+  border-right: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+}
+
+.tabs {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px;
+}
+
+.tab {
+  cursor: pointer;
+  opacity: 0.4;
+}
+
+.tab.active {
+  opacity: 1;
+  font-weight: bold;
+}
+
+.options {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#canvas { flex: 1; }
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+  <div class="tabs">
+    <div class="tab active" data-tab="face">Face</div>
+    <div class="tab" data-tab="clothes">Clothes</div>
+  </div>
+
+  <div class="options" id="options"></div>
+</div>
+
+<div id="canvas"></div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/controls/OrbitControls.js';
+
+// ---------- SCENE ----------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf0f0f0);
+
+const camera = new THREE.PerspectiveCamera(35, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(0,1.5,4);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth-340, window.innerHeight);
+document.getElementById("canvas").appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0,1,0);
+controls.update();
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x444444,1));
+const light = new THREE.DirectionalLight(0xffffff,1);
+light.position.set(2,4,2);
+scene.add(light);
+
+// ---------- JSON SKELETON ----------
+const skeletonJSON = {
+  joints: {
+    root: { pos:[0,0,0], parent:null },
+    spine: { pos:[0,1,0], parent:"root" },
+    head: { pos:[0,0.8,0], parent:"spine" },
+    leftArm: { pos:[-0.6,0.6,0], parent:"spine" },
+    rightArm:{ pos:[0.6,0.6,0], parent:"spine" },
+    leftLeg: { pos:[-0.3,-1,0], parent:"root" },
+    rightLeg:{ pos:[0.3,-1,0], parent:"root" }
+  }
+};
+
+// ---------- BUILD SKELETON ----------
+const jointMeshes = {};
+const boneLines = [];
+const avatarGroup = new THREE.Group();
+scene.add(avatarGroup);
+
+const cubeGeo = new THREE.BoxGeometry(0.1,0.1,0.1);
+const cubeMat = new THREE.MeshStandardMaterial({ color:0x0077ff });
+
+Object.entries(skeletonJSON.joints).forEach(([name,data])=>{
+  const mesh = new THREE.Mesh(cubeGeo, cubeMat);
+  mesh.position.fromArray(data.pos);
+  avatarGroup.add(mesh);
+  jointMeshes[name] = mesh;
+});
+
+// create lines
+Object.entries(skeletonJSON.joints).forEach(([name,data])=>{
+  if(!data.parent) return;
+
+  const points = [
+    jointMeshes[name].position,
+    jointMeshes[data.parent].position
+  ];
+
+  const geo = new THREE.BufferGeometry().setFromPoints(points);
+  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color:0x000000 }));
+  avatarGroup.add(line);
+  boneLines.push({ line, a:name, b:data.parent });
+});
+
+// ---------- MODULES ----------
+let hair, shirt;
+
+function setHair(type){
+  if(hair) jointMeshes.head.remove(hair);
+
+  const mat = new THREE.MeshStandardMaterial({ color: type===0?0xffaa00:0x00ffcc });
+
+  hair = new THREE.Mesh(
+    type===0 ? new THREE.SphereGeometry(0.25,16,16)
+             : new THREE.ConeGeometry(0.25,0.5,16),
+    mat
+  );
+
+  hair.position.y = 0.3;
+  jointMeshes.head.add(hair);
+}
+
+function setShirt(type){
+  if(shirt) jointMeshes.spine.remove(shirt);
+
+  shirt = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8,0.8,0.4),
+    new THREE.MeshStandardMaterial({
+      color: type===0?0x333333:0xff0000
+    })
+  );
+
+  shirt.position.y = 0;
+  jointMeshes.spine.add(shirt);
+}
+
+// ---------- SIMPLE "FACE BLEND" ----------
+let smile = 0;
+
+function updateFace(){
+  // simulate blendshape by scaling head
+  jointMeshes.head.scale.y = 1 + smile * 0.3;
+}
+
+// ---------- UI ----------
+const optionsDiv = document.getElementById("options");
+
+function loadFaceUI(){
+  optionsDiv.innerHTML = "";
+
+  const slider = document.createElement("input");
+  slider.type="range";
+  slider.min=0; slider.max=1; slider.step=0.01;
+
+  slider.oninput = e=>{
+    smile = e.target.value;
+    updateFace();
+  };
+
+  optionsDiv.appendChild(slider);
+}
+
+function loadClothesUI(){
+  optionsDiv.innerHTML="";
+
+  const h1 = document.createElement("button");
+  h1.innerText="Hair 1";
+  h1.onclick=()=>setHair(0);
+
+  const h2 = document.createElement("button");
+  h2.innerText="Hair 2";
+  h2.onclick=()=>setHair(1);
+
+  const s1 = document.createElement("button");
+  s1.innerText="Shirt 1";
+  s1.onclick=()=>setShirt(0);
+
+  const s2 = document.createElement("button");
+  s2.innerText="Shirt 2";
+  s2.onclick=()=>setShirt(1);
+
+  optionsDiv.append(h1,h2,s1,s2);
+}
+
+document.querySelectorAll(".tab").forEach(tab=>{
+  tab.onclick=()=>{
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+
+    if(tab.dataset.tab==="clothes") loadClothesUI();
+    else loadFaceUI();
+  };
+});
+
+loadFaceUI();
+
+// ---------- ANIMATION ----------
+let clock = new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+
+  const t = clock.getElapsedTime();
+
+  // animate arms
+  jointMeshes.leftArm.rotation.z = Math.sin(t)*0.5;
+  jointMeshes.rightArm.rotation.z = -Math.sin(t)*0.5;
+
+  // update bone lines
+  boneLines.forEach(b=>{
+    const pts = [
+      jointMeshes[b.a].position,
+      jointMeshes[b.b].position
+    ];
+    b.line.geometry.setFromPoints(pts);
+  });
+
+  controls.update();
+  renderer.render(scene,camera);
+}
+animate();
+
+// ---------- RESIZE ----------
+window.addEventListener("resize", ()=>{
+  camera.aspect=(window.innerWidth-340)/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth-340,window.innerHeight);
+});
+</script>
+
+</body>
+</html>
