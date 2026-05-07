@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Avatar Builder Test (JSON Skeleton With Vbrae)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+  font-family: sans-serif;
+  background: #f5f5f7;
+}
+#ui {
+  width: 340px;
+  background: white;
+  border-right: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+}
+.tabs {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px;
+}
+.tab {
+  cursor: pointer;
+  opacity: 0.4;
+}
+.tab.active {
+  opacity: 1;
+  font-weight: bold;
+}
+.options {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#canvas { flex: 1; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div class="tabs">
+    <div class="tab active" data-tab="face">Face</div>
+    <div class="tab" data-tab="clothes">Clothes</div>
+  </div>
+  <div class="options" id="options"></div>
+</div>>
+
+<div id="canvas"></div>
+<script type="module">
+import * as THREE from "https://esm.sh/three@0.160.0?bundle";
+import { OrbitControls } from "https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+/**
+skeleton hierarchy
+root
+ ├── spine
+ │    ├── head
+ │    ├── leftArm
+ │    └── rightArm
+ └── legs
+**/
+// ---------- SCENE ----------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+const camera = new THREE.PerspectiveCamera(35, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(0,1.5,4);
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth-340, window.innerHeight);
+document.getElementById("canvas").appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0,1,0);
+controls.update();
+scene.add(new THREE.HemisphereLight(0xffffff,0x444444,1));
+const light = new THREE.DirectionalLight(0xffffff,1);
+light.position.set(2,4,2);
+scene.add(light);
+// ---------- JSON SKELETON (LOCAL OFFSETS) ----------
+const skeletonJSON = {
+  // ROOT
+  root: {
+    pos: [0, 0, 0],
+    parent: null
+  },
+  // SPINE / VERTEBRAE
+  spine: {
+    pos: [0, 0.4, 0],
+    parent: "root"
+  },
+  vertebrae1: {
+    pos: [0, 0.3, 0],
+    parent: "spine"
+  },
+  vertebrae2: {
+    pos: [0, 0.3, 0],
+    parent: "vertebrae1"
+  },
+  vertebrae3: {
+    pos: [0, 0.3, 0],
+    parent: "vertebrae2"
+  },
+  vertebrae4: {
+    pos: [0, 0.3, 0],
+    parent: "vertebrae3"
+  },
+  head: {
+    pos: [0, 0.35, 0],
+    parent: "vertebrae4"
+  },
+  // LEFT ARM
+  leftShoulder: {
+    pos: [-0.35, 0.15, 0],
+    parent: "vertebrae4"
+  },
+  leftElbow: {
+    pos: [-0.45, 0, 0],
+    parent: "leftShoulder"
+  },
+  leftHand: {
+    pos: [-0.45, 0, 0],
+    parent: "leftElbow"
+  },
+  // RIGHT ARM
+  rightShoulder: {
+    pos: [0.35, 0.15, 0],
+    parent: "vertebrae4"
+  },
+  rightElbow: {
+    pos: [0.45, 0, 0],
+    parent: "rightShoulder"
+  },
+  rightHand: {
+    pos: [0.45, 0, 0],
+    parent: "rightElbow"
+  },
+  // LEFT LEG
+  leftHip: {
+    pos: [-0.25, -0.2, 0],
+    parent: "root"
+  },
+  leftKnee: {
+    pos: [0, -0.65, 0],
+    parent: "leftHip"
+  },
+  leftFoot: {
+    pos: [0, -0.65, 0.1],
+    parent: "leftKnee"
+  },
+  // RIGHT LEG
+  rightHip: {
+    pos: [0.25, -0.2, 0],
+    parent: "root"
+  },
+  rightKnee: {
+    pos: [0, -0.65, 0],
+    parent: "rightHip"
+  },
+  rightFoot: {
+    pos: [0, -0.65, 0.1],
+    parent: "rightKnee"
+  }
+};
+// ---------- BUILD HIERARCHY ----------
+const joints = {};
+const avatar = new THREE.Group();
+scene.add(avatar);
+// create joint nodes
+Object.keys(skeletonJSON).forEach(name=>{
+  const joint = new THREE.Object3D();
+  joints[name] = joint;
+});
+// link hierarchy
+Object.entries(skeletonJSON).forEach(([name,data])=>{
+  const joint = joints[name];
+  joint.position.fromArray(data.pos);
+  if(data.parent){
+    joints[data.parent].add(joint);
+  } else {
+    avatar.add(joint);
+  }
+  // visual cube
+  const cube = new THREE.Mesh(
+    new THREE.BoxGeometry(0.1,0.1,0.1),
+    new THREE.MeshStandardMaterial({ color:0x0077ff })
+  );
+  joint.add(cube);
+  const axes = new THREE.AxesHelper(0.3);
+joint.add(axes);
+});
+
+scene.add(new THREE.GridHelper(10, 10));
+
+// ---------- RENDER LOOP ----------
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ---------- RESIZE ----------
+window.addEventListener("resize", ()=>{
+  camera.aspect=(window.innerWidth-340)/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth-340,window.innerHeight);
+});
+</script>
+
+</body>
+</html>
+
