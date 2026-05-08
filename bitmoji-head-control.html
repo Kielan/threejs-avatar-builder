@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Spore Style Vertebrae Creature Editor</title>
+
+<style>
+
+html, body {
+    margin: 0;
+    overflow: hidden;
+    background: #10141d;
+    font-family: sans-serif;
+}
+
+canvas {
+    display: block;
+}
+
+#ui {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+}
+
+button {
+
+    background: #2a6cff;
+    color: white;
+
+    border: none;
+    border-radius: 8px;
+
+    padding: 12px 16px;
+
+    cursor: pointer;
+
+    font-size: 14px;
+
+    margin-bottom: 8px;
+}
+
+button:hover {
+    background: #4d88ff;
+}
+
+#info {
+
+    position: absolute;
+
+    bottom: 20px;
+    left: 20px;
+
+    color: #d0d8ff;
+
+    background: rgba(0,0,0,0.35);
+
+    padding: 12px 14px;
+
+    border-radius: 8px;
+
+    font-size: 13px;
+
+    line-height: 1.5;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+    <button id="growBtn">Grow Vertebra</button>
+</div>
+
+<div id="info">
+
+Hover = glow<br>
+Drag = twist spine root<br>
+ALT + click vertebra = rotation gizmo<br>
+Drag gizmo = rotate vertebra<br>
+Head + torso attached procedurally
+
+</div>
+
+<script type="module">
+
+import * as THREE from 'https://esm.sh/three@0.161.0';
+import { OrbitControls } from 'https://esm.sh/three@0.161.0/examples/jsm/controls/OrbitControls.js';
+
+////////////////////////////////////////////////////////////////////////////////
+// SCENE
+////////////////////////////////////////////////////////////////////////////////
+
+const scene = new THREE.Scene();
+
+scene.background = new THREE.Color(0x131722);
+
+////////////////////////////////////////////////////////////////////////////////
+// CAMERA
+////////////////////////////////////////////////////////////////////////////////
+
+const camera = new THREE.PerspectiveCamera(
+    55,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    100
+);
+
+camera.position.set(0, 2.5, 8);
+
+////////////////////////////////////////////////////////////////////////////////
+// RENDERER
+////////////////////////////////////////////////////////////////////////////////
+
+const renderer = new THREE.WebGLRenderer({
+    antialias: true
+});
+
+renderer.setPixelRatio(window.devicePixelRatio);
+
+renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+);
+
+document.body.appendChild(renderer.domElement);
+
+////////////////////////////////////////////////////////////////////////////////
+// CONTROLS
+////////////////////////////////////////////////////////////////////////////////
+
+const controls = new OrbitControls(
+    camera,
+    renderer.domElement
+);
+
+controls.enableDamping = true;
+
+////////////////////////////////////////////////////////////////////////////////
+// LIGHTS
+////////////////////////////////////////////////////////////////////////////////
+
+const hemi = new THREE.HemisphereLight(
+    0xffffff,
+    0x223344,
+    1.7
+);
+
+scene.add(hemi);
+
+const dir = new THREE.DirectionalLight(
+    0xffffff,
+    1.8
+);
+
+dir.position.set(5, 10, 6);
+
+scene.add(dir);
+
+////////////////////////////////////////////////////////////////////////////////
+// FLOOR
+////////////////////////////////////////////////////////////////////////////////
+
+const floor = new THREE.Mesh(
+
+    new THREE.CircleGeometry(20, 64),
+
+    new THREE.MeshStandardMaterial({
+        color: 0x334422,
+        roughness: 1
+    })
+);
+
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -2;
+
+scene.add(floor);
+
+////////////////////////////////////////////////////////////////////////////////
+// CREATURE ROOT
+////////////////////////////////////////////////////////////////////////////////
+
+const creature = new THREE.Group();
+
+scene.add(creature);
+
+////////////////////////////////////////////////////////////////////////////////
+// CREATURE JSON DATA
+////////////////////////////////////////////////////////////////////////////////
+
+const creatureData = {
+
+    body: {
+
+        torsoColor: 0xff4444
+    },
+
+    spine: {
+
+        vertebrae: [
+
+            {
+                radius: 0.42,
+                height: 0.48,
+                position: [0, 0, 0]
+            },
+
+            {
+                radius: 0.39,
+                height: 0.46,
+                position: [0, 0.55, 0]
+            },
+
+            {
+                radius: 0.35,
+                height: 0.42,
+                position: [0, 1.02, 0]
+            },
+
+            {
+                radius: 0.31,
+                height: 0.38,
+                position: [0, 1.42, 0]
+            }
+        ]
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// BODY MASS
+////////////////////////////////////////////////////////////////////////////////
+
+const torsoGroup = new THREE.Group();
+
+creature.add(torsoGroup);
+
+const torsoMaterial = new THREE.MeshPhysicalMaterial({
+
+    color: creatureData.body.torsoColor,
+
+    transparent: true,
+    opacity: 0.30,
+
+    roughness: 0.55,
+
+    transmission: 0.2,
+
+    clearcoat: 1,
+
+    thickness: 0.5,
+
+    side: THREE.DoubleSide
+});
+
+////////////////////////////////////////////////////////////////////////////////
+// TORSO
+////////////////////////////////////////////////////////////////////////////////
+
+const torsoMesh = new THREE.Mesh(
+
+    new THREE.CapsuleGeometry(
+        1.2,
+        2.8,
+        16,
+        24
+    ),
+
+    torsoMaterial
+);
+
+torsoMesh.position.y = 0.8;
+
+torsoGroup.add(torsoMesh);
+
+////////////////////////////////////////////////////////////////////////////////
+// SHOULDERS
+////////////////////////////////////////////////////////////////////////////////
+
+const shoulderMesh = new THREE.Mesh(
+
+    new THREE.SphereGeometry(
+        1.1,
+        24,
+        24
+    ),
+
+    torsoMaterial
+);
+
+shoulderMesh.scale.y = 0.55;
+
+shoulderMesh.position.y = 1.8;
+
+torsoGroup.add(shoulderMesh);
+
+////////////////////////////////////////////////////////////////////////////////
+// NECK
+////////////////////////////////////////////////////////////////////////////////
+
+const neckMesh = new THREE.Mesh(
+
+    new THREE.CapsuleGeometry(
+        0.35,
+        0.6,
+        12,
+        16
+    ),
+
+    torsoMaterial
+);
+
+neckMesh.position.y = 2.3;
+
+torsoGroup.add(neckMesh);
+
+////////////////////////////////////////////////////////////////////////////////
+// SPINE ROOT
+////////////////////////////////////////////////////////////////////////////////
+
+const spineRoot = new THREE.Group();
+
+creature.add(spineRoot);
+
+const vertebrae = [];
+
+////////////////////////////////////////////////////////////////////////////////
+// CREATE VERTEBRA
+////////////////////////////////////////////////////////////////////////////////
+
+function createVertebra(data, index) {
+
+    const geo = new THREE.CapsuleGeometry(
+        data.radius,
+        data.height,
+        8,
+        16
+    );
+
+    const mat = new THREE.MeshStandardMaterial({
+
+        color: 0xd9c8b5,
+
+        roughness: 0.75,
+
+        emissive: 0x000000,
+        emissiveIntensity: 0
+    });
+
+    const mesh = new THREE.Mesh(
+        geo,
+        mat
+    );
+
+    mesh.position.fromArray(data.position);
+
+    mesh.userData.index = index;
+
+    return mesh;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// BUILD SPINE
+////////////////////////////////////////////////////////////////////////////////
+
+function buildSpine() {
+
+    while (spineRoot.children.length > 0) {
+
+        spineRoot.remove(
+            spineRoot.children[0]
+        );
+    }
+
+    vertebrae.length = 0;
+
+    let parent = spineRoot;
+
+    creatureData.spine.vertebrae.forEach((v, index) => {
+
+        const bone =
+            createVertebra(v, index);
+
+        bone.position.y =
+            index === 0
+            ? v.position[1]
+            : v.position[1]
+            - creatureData.spine.vertebrae[index - 1].position[1];
+
+        parent.add(bone);
+
+        vertebrae.push(bone);
+
+        parent = bone;
+    });
+
+    attachHead();
+}
+
+buildSpine();
+
+////////////////////////////////////////////////////////////////////////////////
+// HEAD
+////////////////////////////////////////////////////////////////////////////////
+
+let headGroup = null;
+
+function attachHead() {
+
+    if (headGroup) {
+
+        scene.remove(headGroup);
+    }
+
+    headGroup = new THREE.Group();
+
+    ////////////////////////////////////////////////////////////////////////////
+    // MAIN HEAD
+    ////////////////////////////////////////////////////////////////////////////
+
+    const skinMat =
+        new THREE.MeshStandardMaterial({
+
+            color: 0xf0c4ad,
+            roughness: 0.85
+        });
+
+    const head = new THREE.Mesh(
+
+        new THREE.SphereGeometry(
+            0.85,
+            32,
+            32
+        ),
+
+        skinMat
+    );
+
+    head.scale.set(
+        1,
+        1.1,
+        0.95
+    );
+
+    headGroup.add(head);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // CHIN
+    ////////////////////////////////////////////////////////////////////////////
+
+    const chin = new THREE.Mesh(
+
+        new THREE.ConeGeometry(
+            0.45,
+            0.8,
+            24
+        ),
+
+        skinMat
+    );
+
+    chin.position.y = -0.7;
+    chin.rotation.x = Math.PI;
+
+    headGroup.add(chin);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // EARS
+    ////////////////////////////////////////////////////////////////////////////
+
+    function makeEar(side) {
+
+        const ear = new THREE.Mesh(
+
+            new THREE.SphereGeometry(
+                0.16,
+                16,
+                16
+            ),
+
+            skinMat
+        );
+
+        ear.scale.z = 0.55;
+
+        ear.position.set(
+            side * 0.82,
+            0.0,
+            0
+        );
+
+        headGroup.add(ear);
+    }
+
+    makeEar(-1);
+    makeEar(1);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // EYES
+    ////////////////////////////////////////////////////////////////////////////
+
+    function makeEye(side) {
+
+        const eyeGroup = new THREE.Group();
+
+        const white = new THREE.Mesh(
+
+            new THREE.SphereGeometry(
+                0.18,
+                24,
+                24
+            ),
+
+            new THREE.MeshStandardMaterial({
+                color: 0xffffff
+            })
+        );
+
+        white.scale.z = 0.45;
+
+        eyeGroup.add(white);
+
+        const iris = new THREE.Mesh(
+
+            new THREE.SphereGeometry(
+                0.09,
+                24,
+                24
+            ),
+
+            new THREE.MeshStandardMaterial({
+                color: 0x3377ff
+            })
+        );
+
+        iris.position.z = 0.12;
+
+        eyeGroup.add(iris);
+
+        const pupil = new THREE.Mesh(
+
+            new THREE.SphereGeometry(
+                0.04,
+                12,
+                12
+            ),
+
+            new THREE.MeshStandardMaterial({
+                color: 0x000000
+            })
+        );
+
+        pupil.position.z = 0.18;
+
+        eyeGroup.add(pupil);
+
+        eyeGroup.position.set(
+            side * 0.28,
+            0.1,
+            0.72
+        );
+
+        headGroup.add(eyeGroup);
+    }
+
+    makeEye(-1);
+    makeEye(1);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // EYEBROWS
+    ////////////////////////////////////////////////////////////////////////////
+
+    function makeBrow(side) {
+
+        const brow = new THREE.Mesh(
+
+            new THREE.CapsuleGeometry(
+                0.02,
+                0.22,
+                4,
+                8
+            ),
+
+            new THREE.MeshStandardMaterial({
+                color: 0x222222
+            })
+        );
+
+        brow.rotation.z = side * 0.18;
+
+        brow.position.set(
+            side * 0.28,
+            0.38,
+            0.78
+        );
+
+        headGroup.add(brow);
+    }
+
+    makeBrow(-1);
+    makeBrow(1);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // NOSE
+    ////////////////////////////////////////////////////////////////////////////
+
+    const nose = new THREE.Mesh(
+
+        new THREE.ConeGeometry(
+            0.06,
+            0.18,
+            12
+        ),
+
+        skinMat
+    );
+
+    nose.rotation.x = Math.PI / 2;
+
+    nose.position.set(
+        0,
+        -0.05,
+        0.84
+    );
+
+    headGroup.add(nose);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // MOUTH
+    ////////////////////////////////////////////////////////////////////////////
+
+    const mouth = new THREE.Mesh(
+
+        new THREE.TorusGeometry(
+            0.12,
+            0.015,
+            8,
+            32,
+            Math.PI
+        ),
+
+        new THREE.MeshStandardMaterial({
+            color: 0x552222
+        })
+    );
+
+    mouth.rotation.z = Math.PI;
+
+    mouth.position.set(
+        0,
+        -0.35,
+        0.78
+    );
+
+    headGroup.add(mouth);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // ATTACH TO TOP VERTEBRA
+    ////////////////////////////////////////////////////////////////////////////
+
+    const top =
+        vertebrae[vertebrae.length - 1];
+
+    top.add(headGroup);
+
+    headGroup.position.y = 0.95;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RAYCASTING
+////////////////////////////////////////////////////////////////////////////////
+
+const raycaster = new THREE.Raycaster();
+
+const mouse = new THREE.Vector2();
+
+let hovered = null;
+
+window.addEventListener('mousemove', (e) => {
+
+    mouse.x =
+        (e.clientX / window.innerWidth) * 2 - 1;
+
+    mouse.y =
+        -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+////////////////////////////////////////////////////////////////////////////////
+// DRAGGING
+////////////////////////////////////////////////////////////////////////////////
+
+let dragging = false;
+
+const lastMouse = new THREE.Vector2();
+
+////////////////////////////////////////////////////////////////////////////////
+// GIZMO
+////////////////////////////////////////////////////////////////////////////////
+
+let selectedVertebra = null;
+
+let rotationMode = false;
+
+const gizmoGroup = new THREE.Group();
+
+scene.add(gizmoGroup);
+
+let gizmoDragging = false;
+
+const dragPlane = new THREE.Plane(
+    new THREE.Vector3(0,0,1),
+    0
+);
+
+const dragPoint = new THREE.Vector3();
+const prevPoint = new THREE.Vector3();
+
+////////////////////////////////////////////////////////////////////////////////
+// ROTATION GIZMO
+////////////////////////////////////////////////////////////////////////////////
+
+function createRotationGizmo() {
+
+    gizmoGroup.clear();
+
+    if (!selectedVertebra) return;
+
+    const radius = 0.9;
+
+    const arc = new THREE.Mesh(
+
+        new THREE.TorusGeometry(
+            radius,
+            0.04,
+            10,
+            64,
+            Math.PI * 1.5
+        ),
+
+        new THREE.MeshStandardMaterial({
+
+            color: 0x55aaff,
+
+            emissive: 0x2277ff,
+
+            emissiveIntensity: 1.2
+        })
+    );
+
+    arc.rotation.y = Math.PI / 2;
+
+    gizmoGroup.add(arc);
+
+    function makeArrow(angle) {
+
+        const g = new THREE.Group();
+
+        const shaft = new THREE.Mesh(
+
+            new THREE.CapsuleGeometry(
+                0.05,
+                0.22,
+                4,
+                8
+            ),
+
+            new THREE.MeshStandardMaterial({
+
+                color: 0x88ccff,
+
+                emissive: 0x3399ff
+            })
+        );
+
+        shaft.rotation.z = Math.PI / 2;
+
+        g.add(shaft);
+
+        const tip = new THREE.Mesh(
+
+            new THREE.ConeGeometry(
+                0.1,
+                0.18,
+                12
+            ),
+
+            new THREE.MeshStandardMaterial({
+
+                color: 0x88ccff,
+
+                emissive: 0x3399ff
+            })
+        );
+
+        tip.position.x = 0.18;
+        tip.rotation.z = -Math.PI / 2;
+
+        g.add(tip);
+
+        g.position.set(
+            Math.cos(angle) * radius,
+            Math.sin(angle) * radius,
+            0
+        );
+
+        g.lookAt(0,0,0);
+
+        gizmoGroup.add(g);
+    }
+
+    makeArrow(0.4);
+    makeArrow(3.8);
+
+    selectedVertebra.getWorldPosition(
+        gizmoGroup.position
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// POINTER DOWN
+////////////////////////////////////////////////////////////////////////////////
+
+renderer.domElement.addEventListener(
+'pointerdown',
+(e) => {
+
+    raycaster.setFromCamera(
+        mouse,
+        camera
+    );
+
+    ////////////////////////////////////////////////////////////////////////////
+    // GIZMO
+    ////////////////////////////////////////////////////////////////////////////
+
+    const gizmoHits =
+        raycaster.intersectObjects(
+            gizmoGroup.children,
+            true
+        );
+
+    if (gizmoHits.length > 0) {
+
+        gizmoDragging = true;
+
+        raycaster.ray.intersectPlane(
+            dragPlane,
+            prevPoint
+        );
+
+        return;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // VERTEBRA
+    ////////////////////////////////////////////////////////////////////////////
+
+    const hits =
+        raycaster.intersectObjects(
+            vertebrae
+        );
+
+    if (hits.length > 0) {
+
+        selectedVertebra =
+            hits[0].object;
+
+        if (e.altKey) {
+
+            rotationMode =
+                !rotationMode;
+
+            if (rotationMode) {
+
+                createRotationGizmo();
+
+            } else {
+
+                gizmoGroup.clear();
+            }
+        }
+
+        dragging = true;
+
+        lastMouse.set(
+            e.clientX,
+            e.clientY
+        );
+    }
+});
+
+////////////////////////////////////////////////////////////////////////////////
+// POINTER MOVE
+////////////////////////////////////////////////////////////////////////////////
+
+window.addEventListener(
+'pointermove',
+(e) => {
+
+    ////////////////////////////////////////////////////////////////////////////
+    // GIZMO ROTATION
+    ////////////////////////////////////////////////////////////////////////////
+
+    if (
+        gizmoDragging
+        &&
+        selectedVertebra
+    ) {
+
+        raycaster.setFromCamera(
+            mouse,
+            camera
+        );
+
+        if (
+            raycaster.ray.intersectPlane(
+                dragPlane,
+                dragPoint
+            )
+        ) {
+
+            const center =
+                gizmoGroup.position;
+
+            const a1 =
+                Math.atan2(
+                    prevPoint.y - center.y,
+                    prevPoint.x - center.x
+                );
+
+            const a2 =
+                Math.atan2(
+                    dragPoint.y - center.y,
+                    dragPoint.x - center.x
+                );
+
+            const delta = a2 - a1;
+
+            selectedVertebra.rotation.z += delta;
+
+            prevPoint.copy(dragPoint);
+        }
+
+        return;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // ROOT DRAG
+    ////////////////////////////////////////////////////////////////////////////
+
+    if (!dragging) return;
+
+    const dx =
+        e.clientX - lastMouse.x;
+
+    const dy =
+        e.clientY - lastMouse.y;
+
+    spineRoot.rotation.y += dx * 0.01;
+    spineRoot.rotation.x += dy * 0.01;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // BODY FOLLOWS SPINE
+    ////////////////////////////////////////////////////////////////////////////
+
+    torsoGroup.rotation.y =
+        spineRoot.rotation.y;
+
+    torsoGroup.rotation.x =
+        spineRoot.rotation.x;
+
+    lastMouse.set(
+        e.clientX,
+        e.clientY
+    );
+});
+
+////////////////////////////////////////////////////////////////////////////////
+// POINTER UP
+////////////////////////////////////////////////////////////////////////////////
+
+window.addEventListener(
+'pointerup',
+() => {
+
+    dragging = false;
+
+    gizmoDragging = false;
+});
+
+////////////////////////////////////////////////////////////////////////////////
+// GROW BUTTON
+////////////////////////////////////////////////////////////////////////////////
+
+document
+.getElementById('growBtn')
+.addEventListener(
+'click',
+() => {
+
+    const spine =
+        creatureData.spine.vertebrae;
+
+    const last =
+        spine[spine.length - 1];
+
+    spine.push({
+
+        radius:
+            Math.max(
+                0.18,
+                last.radius * 0.92
+            ),
+
+        height:
+            Math.max(
+                0.2,
+                last.height * 0.95
+            ),
+
+        position: [
+            0,
+            last.position[1] + 0.36,
+            0
+        ]
+    });
+
+    buildSpine();
+});
+
+////////////////////////////////////////////////////////////////////////////////
+// CLOCK
+////////////////////////////////////////////////////////////////////////////////
+
+const clock = new THREE.Clock();
+
+////////////////////////////////////////////////////////////////////////////////
+// ANIMATE
+////////////////////////////////////////////////////////////////////////////////
+
+function animate() {
+
+    requestAnimationFrame(animate);
+
+    const t = clock.getElapsedTime();
+
+    ////////////////////////////////////////////////////////////////////////////
+    // HOVER
+    ////////////////////////////////////////////////////////////////////////////
+
+    raycaster.setFromCamera(
+        mouse,
+        camera
+    );
+
+    const hits =
+        raycaster.intersectObjects(
+            vertebrae
+        );
+
+    hovered =
+        hits.length > 0
+        ? hits[0].object
+        : null;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // VERTEBRAE
+    ////////////////////////////////////////////////////////////////////////////
+
+    vertebrae.forEach((v, i) => {
+
+        const wave =
+            Math.sin(
+                t * 2 + i * 0.6
+            ) * 0.04;
+
+        v.rotation.z +=
+            (wave - v.rotation.z) * 0.02;
+
+        const target =
+            hovered === v
+            ? 1.4
+            : 0;
+
+        v.material.emissive.setRGB(
+            0.1,
+            0.5,
+            1.0
+        );
+
+        v.material.emissiveIntensity =
+            THREE.MathUtils.lerp(
+                v.material.emissiveIntensity,
+                target,
+                0.12
+            );
+
+        ////////////////////////////////////////////////////////////////////////////
+        // SELECTION GLOW
+        ////////////////////////////////////////////////////////////////////////////
+
+        if (selectedVertebra === v) {
+
+            v.material.emissive.setRGB(
+                0.2,
+                0.9,
+                1.0
+            );
+
+            v.material.emissiveIntensity =
+                Math.max(
+                    v.material.emissiveIntensity,
+                    1.7
+                );
+        }
+
+        ////////////////////////////////////////////////////////////////////////////
+        // SCALE POP
+        ////////////////////////////////////////////////////////////////////////////
+
+        if (!v.userData.scale) {
+            v.userData.scale = 0.2;
+        }
+
+        v.userData.scale =
+            THREE.MathUtils.lerp(
+                v.userData.scale,
+                1,
+                0.08
+            );
+
+        v.scale.setScalar(
+            v.userData.scale
+        );
+    });
+
+    ////////////////////////////////////////////////////////////////////////////
+    // BODY FLOAT
+    ////////////////////////////////////////////////////////////////////////////
+
+    torsoGroup.position.y =
+        Math.sin(t * 1.2) * 0.03;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // GIZMO FOLLOW
+    ////////////////////////////////////////////////////////////////////////////
+
+    if (
+        selectedVertebra
+        &&
+        rotationMode
+    ) {
+
+        selectedVertebra.getWorldPosition(
+            gizmoGroup.position
+        );
+
+        gizmoGroup.rotation.z += 0.01;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // CONTROLS
+    ////////////////////////////////////////////////////////////////////////////
+
+    controls.update();
+
+    ////////////////////////////////////////////////////////////////////////////
+    // RENDER
+    ////////////////////////////////////////////////////////////////////////////
+
+    renderer.render(
+        scene,
+        camera
+    );
+}
+
+animate();
+
+////////////////////////////////////////////////////////////////////////////////
+// RESIZE
+////////////////////////////////////////////////////////////////////////////////
+
+window.addEventListener(
+'resize',
+() => {
+
+    camera.aspect =
+        window.innerWidth
+        /
+        window.innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+    );
+});
+
+</script>
+</body>
+</html>
