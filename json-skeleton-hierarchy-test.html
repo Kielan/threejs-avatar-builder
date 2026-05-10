@@ -79,7 +79,107 @@ const light = new THREE.DirectionalLight(0xffffff,1);
 light.position.set(2,4,2);
 scene.add(light);
 // ---------- JSON SKELETON (LOCAL OFFSETS) ----------
+/* 
 const skeletonJSON = {
+  // ROOT
+  root: {
+    pos: [0, 0, 0],
+    parent: null
+  },
+
+  // SPINE / VERTEBRAE
+  spine: {
+    pos: [0, 0.4, 0],
+    parent: "root"
+  },
+  vertebrae1: {
+    pos: [0, 0.3, 0],
+    parent: "spine"
+  },
+  vertebrae2: {
+    pos: [0, 0.3, 0],
+    parent: "vertebrae1"
+  },
+  vertebrae3: {
+    pos: [0, 0.3, 0],
+    parent: "vertebrae2"
+  },
+  vertebrae4: {
+    pos: [0, 0.3, 0],
+    parent: "vertebrae3"
+  },
+  head: {
+    pos: [0, 0.35, 0],
+    parent: "vertebrae4"
+  },
+
+  // LEFT ARM
+  leftShoulder: {
+    pos: [-0.35, 0.15, 0],
+    parent: "vertebrae4"
+  },
+  leftElbow: {
+    pos: [-0.45, 0, 0],
+    parent: "leftShoulder"
+  },
+  leftHand: {
+    pos: [-0.45, 0, 0],
+    parent: "leftElbow"
+  },
+
+  // RIGHT ARM
+  rightShoulder: {
+    pos: [0.35, 0.15, 0],
+    parent: "vertebrae4"
+  },
+  rightElbow: {
+    pos: [0.45, 0, 0],
+    parent: "rightShoulder"
+  },
+  rightHand: {
+    pos: [0.45, 0, 0],
+    parent: "rightElbow"
+  },
+
+  // LEFT LEG
+  leftHip: {
+    pos: [-0.25, -0.2, 0],
+    parent: "root"
+  },
+  leftKnee: {
+    pos: [0, -0.65, 0],
+    parent: "leftHip"
+  },
+  leftCalf: {
+    pos: [0, -0.6, 0],   // halfway between knee and foot (adjust as needed)
+    parent: "leftKnee"
+  },
+  leftFoot: {
+    pos: [0, -0.65, 0.1],
+    parent: "leftCalf"
+  },
+
+  // RIGHT LEG
+  rightHip: {
+    pos: [0.25, -0.2, 0],
+    parent: "root"
+  },
+  rightKnee: {
+    pos: [0, -0.65, 0],
+    parent: "rightHip"
+  },
+  rightCalf: {
+    pos: [0, -0.6, 0],   // same idea as left side
+    parent: "rightKnee"
+  },
+  rightFoot: {
+    pos: [0, -0.65, 0.1],
+    parent: "rightCalf"
+  }
+};
+*/
+  
+  const skeletonJSON = {
   // ROOT
   root: {
     pos: [0, 0, 0],
